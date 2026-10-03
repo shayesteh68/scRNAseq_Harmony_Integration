@@ -1,119 +1,76 @@
-# End-to-End Single-Cell RNA-Seq Analysis Pipeline (Seurat v5)
-**Profiling 3k Peripheral Blood Mononuclear Cells (PBMCs) with Unsupervised Clustering and Cell Type Annotation**
+# Multi-Condition scRNA-Seq Integration & Batch Effect Correction with Harmony
 
-![R](https://img.shields.io/badge/R-4.3+-blue.svg)
-![Seurat](https://img.shields.io/badge/Seurat-v5-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-
----
+[![Pipeline: Seurat v5](https://img.shields.io/badge/Pipeline-Seurat%20v5-blue.svg)](https://satijalab.org/seurat/)
+[![Integration: Harmony](https://img.shields.io/badge/Integration-Harmony-orange.svg)](https://github.com/immunogenomics/harmony)
+[![R: 4.3+](https://img.shields.io/badge/R-4.3+-276DC3.svg)](https://www.r-project.org/)
+[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-success.svg)](https://github.com/shayesteh68)
 
 ## Overview
-This repository contains a reproducible, end-to-end single-cell RNA-sequencing (scRNA-seq) workflow implemented in **R** using **Seurat v5**. The pipeline processes the standard 10x Genomics **PBMC 3k** dataset (Peripheral Blood Mononuclear Cells from a healthy donor), performing quality control, normalization, feature selection, dimensionality reduction, unsupervised graph-based clustering, differential expression analysis, and biological cell type annotation.
+This repository provides an end-to-end, publication-grade single-cell RNA-sequencing (scRNA-seq) workflow demonstrating **batch effect correction and cross-condition integration** using **Harmony** in conjunction with **Seurat v5**.
+
+The pipeline integrates PBMC profiles across distinct biological conditions (**Control vs. Interferon-beta [IFN-β] stimulated**), aligns cell states across technical and biological covariates, and identifies cell-type-specific transcriptional responses triggered by interferon activation.
 
 ---
 
-## Biological Insights & Results
+## Key Workflow Modules
 
-The analysis identified **9 distinct immune cell populations** based on well-established canonical markers:
-
-| Cluster | Identified Cell Type | Canonical / Top Markers | Cell Count | Percentage (%) |
-| :---: | :--- | :--- | :---: | :---: |
-| **0** | Naive CD4+ T cells | `CCR7`, `LEF1`, `MAL`, `PIK3IP1` | 684 | 25.9% |
-| **1** | CD14+ Monocytes | `CD14`, `S100A8`, `S100A9`, `FOLR3` | 481 | 18.2% |
-| **2** | Memory CD4+ T cells | `AQP3`, `CD40LG`, `CD2`, `TRAT1` | 476 | 18.0% |
-| **3** | B cells | `CD79A`, `VPREB3`, `TCL1A`, `LINC00926` | 344 | 13.0% |
-| **4** | CD8+ T cells | `CD8A`, `GZMK`, `GZMH`, `CCL5` | 291 | 11.0% |
-| **5** | FCGR3A+ (CD16+) Monocytes | `CKB`, `CDKN1C`, `MS4A4A`, `HES4` | 162 | 6.1% |
-| **6** | Natural Killer (NK) cells | `GNLY`, `GZMB`, `SPON2`, `AKR1C3` | 155 | 5.9% |
-| **7** | Dendritic Cells (DCs) | `FCER1A`, `CLEC10A`, `SERPINF1` | 32 | 1.2% |
-| **8** | Platelets | `PPBP`, `ITGA2B (CD41)`, `GP9`, `PF4` | 13 | 0.5% |
-
-<p align="center">
-  <img src="figures/08_umap_annotated_celltypes.png" width="65%" alt="UMAP Cell Annotation">
-  <img src="figures/09_cell_type_proportions.png" width="65%" alt="Cell Type Proportions">
-</p>
+1. **`01_load_and_setup.R`**: Environment initialization, SeuratData loading (`ifnb` stimulation cohort), and multimodal metadata structuring.
+2. **`02_qc_and_filtering.R`**: Strict cell quality control (filtering by mitochondrial read percentage, unique feature counts, and total UMIs).
+3. **`03_integration_harmony.R`**: Normalization, feature selection (HVGs), PCA dimension reduction, and **Harmony** matrix factorization to eliminate batch-induced variance while preserving biological heterogeneity.
+4. **`04_celltype_DE_IFNB.R`**: Cell type annotation, unsupervised graph-based clustering, and stratified differential expression (DE) identifying IFN-stimulated marker signatures across lineages (CD4 T cells, CD8 T cells, B cells, Monocytes, NK cells, and DCs).
+5. **`05_visualization.R`**: Publication-ready UMAP plots (pre- vs. post-integration), conserved marker heatmaps, and response dot plots.
 
 ---
 
-## Pipeline Workflow
-
-1. **Quality Control & Filtering (`01_qc_filter.R`)**:
-   - Filtered low-quality cells and potential doublets/empty droplets:
-     - `nFeature_RNA`: 200 to 2,500 genes
-     - Mitochondrial read percentage: < 5%
-   - Retained **2,638 high-quality cells** out of 2,700 raw cells.
-
-2. **Normalization & Feature Selection (`02_normalize_pca.R`)**:
-   - Applied global scaling normalization (`LogNormalize`, scale factor = 10,000).
-   - Identified **top 2,000 highly variable genes (HVGs)** using variance-stabilizing transformation (`vst`).
-   - Scaled data and performed linear dimensionality reduction via **PCA**.
-
-3. **Graph-based Clustering & UMAP (`03_clustering_umap.R`)**:
-   - Constructed Shared Nearest Neighbor (SNN) graph using top 10 principal components.
-   - Clustered cells using the Louvain algorithm (`resolution = 0.5`).
-   - Projected cells onto 2D space using **UMAP**.
-
-4. **Biomarker Identification (`04_find_markers.R`)**:
-   - Wilcoxon Rank Sum test with Bonferroni correction (`FindAllMarkers`).
-   - Extracted positive cluster markers (`log2FC >= 0.25`, `min.pct = 0.25`).
-   - Generated marker expression Heatmaps and DotPlots.
-
-5. **Cell Type Annotation (`05_cell_annotation.R`)**:
-   - Curated and assigned immunological identities based on known markers.
-   - Generated final publication-ready figures.
-
----
-
-## Repository Structure
+## Directory Structure
 
 ```text
-├── data/
-│   └── filtered_gene_bc_matrices/hg19/
-├── figures/
-├── results/
-│   ├── qc/
-│   ├── clustering/
-│   ├── markers/
-│   └── final_annotated_pbmc.rds
+scRNAseq_Harmony_Integration/
+├── data/                 # Raw and processed RDS objects / SeuratData cache
+├── figures/              # Publication-ready visualization outputs
+│   ├── qc/               # Pre/post filtering violin and scatter plots
+│   ├── integration/      # Pre vs. Post-Harmony integration UMAP embeddings
+│   └── de_celltype/      # Cell-type specific response heatmaps & dot plots
+├── results/              # Differential expression result tables (.tsv / .csv)
 ├── scripts/
-│   ├── 01_qc_filter.R
-│   ├── 02_normalize_pca.R
-│   ├── 03_clustering_umap.R
-│   ├── 04_find_markers.R
-│   └── 05_cell_annotation.R
-├── environment.yml
-├── .gitignore
+│   ├── 01_load_and_setup.R
+│   ├── 02_qc_and_filtering.R
+│   ├── 03_integration_harmony.R
+│   ├── 04_celltype_DE_IFNB.R
+│   └── 05_visualization.R
+├── environment.yml       # Reproducible Conda/Mamba bioinformatics environment
 └── README.md
 ```
 
 ---
 
-## Installation & Usage
+## Results Highlights
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/shayesteh68/scrnaseq-seurat-pbmc3k.git
-cd scrnaseq-seurat-pbmc3k
-```
+- **Effective Batch Removal**: Complete cross-dataset alignment without over-clustering or masking biological divergence.
+- **Robust Lineage Preservation**: Major immune subsets retain discrete identity markers post-correction.
+- **Interferon Signature Mapping**: High-confidence detection of canonical IFN-stimulated genes (ISG15, IFI6, IFIT1, MX1) stratified across immune cell subsets.
 
-### 2. Set up environment
-```bash
-conda env create -f environment.yml
-conda activate r_seurat_env
-```
+---
 
-### 3. Run the pipeline
+## Reproducibility & Execution
+
 ```bash
-Rscript scripts/01_qc_filter.R
-Rscript scripts/02_normalize_pca.R
-Rscript scripts/03_clustering_umap.R
-Rscript scripts/04_find_markers.R
-Rscript scripts/05_cell_annotation.R
+# 1. Clone repository
+git clone https://github.com/shayesteh68/scRNAseq_Harmony_Integration.git
+cd scRNAseq_Harmony_Integration
+
+# 2. Run execution pipeline
+Rscript scripts/01_load_and_setup.R
+Rscript scripts/02_qc_and_filtering.R
+Rscript scripts/03_integration_harmony.R
+Rscript scripts/04_celltype_DE_IFNB.R
+Rscript scripts/05_visualization.R
 ```
 
 ---
 
 ## Author
-**Narges Shayesteh**
-- LinkedIn: [linkedin.com/in/narges-shayesteh](https://linkedin.com/in/narges-shayesteh)
+**Narges Shayesteh**  
+*Bioinformatics Specialist | Transcriptomics & Single-Cell Genomics*  
+- LinkedIn: [narges-shayesteh](https://www.linkedin.com/in/narges-shayesteh)  
 - GitHub: [@shayesteh68](https://github.com/shayesteh68)
