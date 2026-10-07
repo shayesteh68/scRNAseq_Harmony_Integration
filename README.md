@@ -1,85 +1,136 @@
-# scRNA-seq Integration with Harmony - Human PBMC IFN-beta Dataset
+# Single-Cell RNA-Seq Integration with Harmony
 
-**Condition-aware single-cell RNA-seq analysis in R (Seurat v5 + Harmony): integration of a two-condition PBMC dataset, graph-based clustering, UMAP, marker-based cell-type annotation, and cell-type-specific differential expression.**
+**PBMC control vs. IFN-β stimulation - Harmony batch integration, unsupervised clustering and per-cell-type differential expression**
 
-![R](https://img.shields.io/badge/R-4.6.1-blue.svg)
-![Seurat](https://img.shields.io/badge/Seurat-v5-green.svg)
-![Harmony](https://img.shields.io/badge/Integration-Harmony-orange.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Language](https://img.shields.io/badge/language-R-blue.svg)
+![Integration](https://img.shields.io/badge/integration-Harmony-orange.svg)
+![Data](https://img.shields.io/badge/data-scRNA--seq-green.svg)
 
 ---
 
 ## Overview
 
-This repository contains a reproducible single-cell RNA-seq (scRNA-seq) workflow implemented in **R** with **Seurat v5**, applied to the 10x Genomics **PBMC IFN-beta** dataset. The dataset contains two conditions - a **control (CTRL)** group and an **interferon-beta stimulated (STIM)** group - generated in separate batches.
+This repository contains a reproducible single-cell RNA-sequencing (scRNA-seq) workflow written in **R**. Starting from raw PBMC count data profiled in two conditions - untreated **control** and **IFN-β stimulation** - the pipeline performs quality control, normalization, batch/condition integration with **Harmony**, graph-based clustering, and per-cell-type **differential expression (DE)** analysis between the two conditions.
 
-When both conditions are analyzed together without correction, cells can separate in the embedding space for technical as well as biological reasons, and unsupervised clustering may follow the condition rather than the cell identity. This workflow therefore integrates the data with **Harmony**, which projects the PCA embedding into a shared space while correcting the specified condition/batch covariate, and only then performs clustering, visualization, and downstream statistics.
-
-The practical goal of the project is to show a clean, methodologically defensible treatment of a central scRNA-seq question: **does the clustering survive integration, and does it still capture real cell types?**
+The central question addressed here is not only "which cell types are present", but **"how does each individual cell population respond to IFN-β stimulation"**.
 
 ---
 
-## Pipeline Workflow
+## Dataset and experimental design
 
-1. **Data loading, quality control and setup** - loads the IFN-beta PBMC dataset, applies QC filtering, and writes the filtered Seurat object to `data/processed/ifnb_filtered.rds`.
-2. **Normalization and linear dimensionality reduction** - log-normalization, selection of highly variable genes, scaling, and PCA on the scaled data.
-3. **Harmony integration and clustering** - `RunHarmony()` is applied to the PCA embedding using the **condition/batch variable** as the grouping covariate; the SNN graph, graph-based clusters, and UMAP are computed **on the Harmony embedding**; the integrated object is written to `data/processed/ifnb_harmony_integrated.rds`.
-4. **Cell-type annotation** - clusters are annotated from canonical marker genes and visualized on the integrated UMAP.
-5. **Cell-type-specific differential expression** - STIM vs. CTRL differential expression within each annotated cell type, summarized in `DE_summary_top_genes.csv` (top up- and down-regulated genes per cell type).
-
-The analysis order is described above; the exact script files that implement it are listed in the **Scripts** section below, taken directly from the repository contents.
+- Two conditions: `control` (`ctrl`) and `IFN-β stimulated` (`stim`).
+- Cells are annotated into **13 immune cell populations** (table below).
+- Raw count data is **not** tracked in this repository. Place the input files under `data/raw/`; intermediate and processed objects produced by the pipeline are written to `data/processed/`.
 
 ---
 
-## Key Outputs
+## Cell populations profiled
 
-- `data/processed/ifnb_filtered.rds` - quality-controlled Seurat object
-- `data/processed/ifnb_harmony_integrated.rds` - Harmony-integrated, clustered and annotated Seurat object
-- `DE_summary_top_genes.csv` - top up- and down-regulated genes per cell type (STIM vs. CTRL). The top signature is dominated by interferon-stimulated genes (ISGs), the expected biological response to IFN-beta stimulation.
+| Cell population | Cells (total) | Control | IFN-β stimulated |
+| :--- | ---: | ---: | ---: |
+| CD14 Mono | 4362 | 2215 | 2147 |
+| CD4 Naive T | 2504 | 978 | 1526 |
+| CD4 Memory T | 1762 | 859 | 903 |
+| CD16 Mono | 1044 | 507 | 537 |
+| B | 977 | 407 | 570 |
+| CD8 T | 813 | 352 | 461 |
+| T activated | 633 | 300 | 333 |
+| NK | 619 | 298 | 321 |
+| DC | 472 | 258 | 214 |
+| B Activated | 388 | 185 | 203 |
+| Mk | 236 | 115 | 121 |
+| pDC | 132 | 51 | 81 |
+| Eryth | 55 | 23 | 32 |
+| **TOTAL** | **13997** | **6548** | **7449** |
 
 ---
 
-## Scripts
+## Analysis pipeline
+
+| Step | Script | Purpose |
+| :---: | :--- | :--- |
+| 1 | `scripts/01_load_and_setup.R` | Load the count data, build the Seurat object and set up the project |
+| 2 | `scripts/02_qc_and_filtering.R` | Quality control and cell filtering; QC violin plots (`figures/qc/`) |
+| 3 | `scripts/03_integration_harmony.R` | Integrate conditions/batches with Harmony; UMAP before and after integration |
+| 4 | `scripts/04_celltype_DE_IFNB.R` | Per-cell-type DE analysis (control vs IFN-β), ISG signature dot plot, volcano plot, DE summary table |
+| 5 | `scripts/05_visualization.R` | Final publication-ready figures |
+
+---
+
+## Repository structure
 ```text
-scripts/01_load_and_setup.R
-scripts/02_qc_and_filtering.R
-scripts/03_integration_harmony.R
-scripts/04_celltype_DE_IFNB.R
-scripts/05_visualization.R
+scRNAseq_Harmony_Integration/
++-- data/
+|   +-- raw/                 # input count data (place here)
+|   +-- processed/           # intermediate / processed objects
++-- figures/
+|   +-- qc/
+|   |   +-- pre_filtering_violin.png
+|   |   +-- post_filtering_violin.png
+|   +-- integration/
+|   |   +-- unintegrated_umap.png
+|   |   +-- harmony_integrated_umap.png
+|   |   +-- integration_comparison_portfolio.png
+|   +-- de_celltype/
+|       +-- ISG_signature_dotplot.png
+|       +-- Monocyte_IFNB_Volcano.png
++-- results/
+|   +-- de_celltype/
+|       +-- DE_summary_top_genes.csv
++-- scripts/
+|   +-- 01_load_and_setup.R
+|   +-- 02_qc_and_filtering.R
+|   +-- 03_integration_harmony.R
+|   +-- 04_celltype_DE_IFNB.R
+|   +-- 05_visualization.R
++-- .gitignore
++-- environment.yml
++-- README.md
 
-## Repository Structure
+---
 
-text
-README.docx
-README.md
-data
-data/processed
-data/raw
-environment.yml
-figures
-figures/de_celltype
-figures/integration
-figures/qc
-fix_readme.sh
-results
-results/de_celltype
-scripts
-scripts/01_load_and_setup.R
-scripts/02_qc_and_filtering.R
-scripts/03_integration_harmony.R
-scripts/04_celltype_DE_IFNB.R
-scripts/05_visualization.R
+## Requirements and environment
 
-## Requirements
+- **R** with the **Seurat** and **Harmony** packages, plus the analysis dependencies used by the pipeline.
+- The complete, pinned environment is defined in `environment.yml` (Conda).
 
-- R 4.6.1
-- Seurat v5, SeuratObject, harmony, dplyr, ggplot2
-- SeuratData (source of the IFNB dataset)
+---
+
+## Installation and usage
+
+### 1. Clone the repository
+
+bash
+git clone https://github.com/shayesteh68/scRNAseq_Harmony_Integration.git
+cd scRNAseq_Harmony_Integration
+
+### 2. Create and activate the environment
+
+bash
+conda env create -f environment.yml
+conda activate scRNA_integration
+
+### 3. Run the pipeline in order
+
+bash
+Rscript scripts/01_load_and_setup.R
+Rscript scripts/02_qc_and_filtering.R
+Rscript scripts/03_integration_harmony.R
+Rscript scripts/04_celltype_DE_IFNB.R
+Rscript scripts/05_visualization.R
+
+---
+
+## Results
+
+- **`results/de_celltype/DE_summary_top_genes.csv`** - one row per cell population, with the number of cells per condition and the top 10 up- and down-regulated genes (`top_up`, `top_dn`).
+- **`figures/integration/`** - side-by-side UMAP comparison before and after Harmony integration.
+- **`figures/de_celltype/`** - ISG signature dot plot across cell populations and the monocyte volcano plot.
 
 ---
 
 ## Author
 
 **Narges Shayesteh**
-- GitHub: [@shayesteh68](https://github.com/shayesteh68)
 - LinkedIn: [linkedin.com/in/narges-shayesteh](https://linkedin.com/in/narges-shayesteh)
+- GitHub: [@shayesteh68](https://github.com/shayesteh68)
