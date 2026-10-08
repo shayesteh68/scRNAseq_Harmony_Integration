@@ -1,0 +1,11 @@
+name: scRNA_integration
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.3.0
+  - r-seurat
+  - r-harmony
+  - r-tidyverse
+  - r-ggplot2
+  - r-patchwork

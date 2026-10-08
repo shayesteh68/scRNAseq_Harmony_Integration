@@ -1,0 +1,10 @@
+.Rhistory
+.RData
+.Rproj.user
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+results/de_celltype/*.csv
+!results/de_celltype/DE_summary_top_genes.csv
+.DS_Store
