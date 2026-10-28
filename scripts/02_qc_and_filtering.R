@@ -15,7 +15,7 @@ ifnb[["percent.mt"]] <- PercentageFeatureSet(ifnb, pattern = "^MT-")
 p_pre_vln <- VlnPlot(ifnb, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, group.by = "stim")
 ggsave("figures/qc/pre_filtering_violin.png", plot = p_pre_vln, width = 10, height = 5)
 
-# Filter low-quality cells and doublets/debris
+# Filter by gene and mitochondrial metrics. This is not a dedicated doublet caller.
 ifnb_filtered <- subset(ifnb, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 5)
 
 # Plot post-filtering QC metrics

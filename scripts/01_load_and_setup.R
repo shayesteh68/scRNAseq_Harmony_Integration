@@ -1,18 +1,18 @@
-library(Seurat)
-library(SeuratData)
-library(patchwork)
+#!/usr/bin/env Rscript
+
+suppressPackageStartupMessages({
+  library(Seurat)
+})
 
 dir.create("data/raw", recursive = TRUE, showWarnings = FALSE)
+dir.create("data/processed", recursive = TRUE, showWarnings = FALSE)
 
-# Load dataset from the installed package
-data("ifnb")
-
-# Update object structure to Seurat v5 format
-message("Updating Seurat object structure to v5...")
+if (!requireNamespace("SeuratData", quietly = TRUE)) {
+  stop("Install SeuratData and its ifnb dataset as described in README.md.")
+}
+ifnb <- SeuratData::LoadData("ifnb")
 ifnb <- UpdateSeuratObject(ifnb)
-
-# Save standardized object to raw directory
 saveRDS(ifnb, file = "data/raw/ifnb_raw.rds")
 
-message("--- Dataset Summary ---")
+message("Loaded the SeuratData ifnb object:")
 print(ifnb)

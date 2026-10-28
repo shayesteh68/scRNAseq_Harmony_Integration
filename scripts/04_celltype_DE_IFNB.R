@@ -1,77 +1,123 @@
-library(Seurat)
-library(dplyr)
-library(ggplot2)
+#!/usr/bin/env Rscript
 
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(Matrix)
+  library(DESeq2)
+})
+
+input_rds <- "data/processed/ifnb_harmony_integrated.rds"
+if (!file.exists(input_rds)) stop("Integrated object missing: ", input_rds)
 dir.create("results/de_celltype", recursive = TRUE, showWarnings = FALSE)
-dir.create("figures/de_celltype", recursive = TRUE, showWarnings = FALSE)
 
-# Load integrated object (Harmony already computed)
-obj <- readRDS("data/processed/ifnb_harmony_integrated.rds")
+obj <- readRDS(input_rds)
+required <- c("stim", "donor_id", "seurat_annotations")
+metadata <- obj[[]]
+if (!all(required %in% colnames(metadata))) {
+  stop("Object metadata must contain: ", paste(required, collapse = ", "))
+}
+if (anyNA(metadata$stim) || anyNA(metadata$donor_id) || anyNA(metadata$seurat_annotations)) {
+  stop("Stimulation, donor, and cell-type metadata must not contain missing values.")
+}
+metadata$stim <- as.character(metadata$stim)
+metadata$donor_id <- as.character(metadata$donor_id)
+metadata$seurat_annotations <- as.character(metadata$seurat_annotations)
+if (!all(metadata$stim %in% c("CTRL", "STIM"))) {
+  stop("Expected stim values CTRL and STIM.")
+}
 
-# Safety checks
-stopifnot("stim" %in% colnames(obj@meta.data))
-stopifnot("seurat_annotations" %in% colnames(obj@meta.data))
-
-# Make sure identities are cell types
-Idents(obj) <- "seurat_annotations"
-
-celltypes <- levels(Idents(obj))
-
-all_summaries <- list()
-
-# Run DE within each cell type: STIM vs CTRL
-# Using RNA assay's normalized data; for pseudobulk later we can add a stronger analysis.
 DefaultAssay(obj) <- "RNA"
+obj <- JoinLayers(obj, assay = "RNA")
+metadata <- obj[[]][colnames(obj), , drop = FALSE]
+metadata$stim <- as.character(metadata$stim)
+metadata$donor_id <- as.character(metadata$donor_id)
+metadata$seurat_annotations <- as.character(metadata$seurat_annotations)
+counts <- GetAssayData(obj, assay = "RNA", layer = "counts")
+cell_types <- sort(unique(metadata$seurat_annotations))
+result_rows <- list()
+summary_rows <- list()
 
-for (ct in celltypes) {
-  message("Processing cell type: ", ct)
-
-  cells_ct <- WhichCells(obj, idents = ct)
-  obj_ct <- subset(obj, cells = cells_ct)
-
-  # Ensure both conditions exist in this cell type
-  tab <- table(obj_ct$stim)
-  if (!all(c("CTRL", "STIM") %in% names(tab))) {
-    message("Skipping ", ct, " (missing CTRL or STIM). Counts: ", paste(names(tab), tab, collapse = ", "))
+for (cell_type in cell_types) {
+  cells <- rownames(metadata)[metadata$seurat_annotations == cell_type]
+  cell_meta <- metadata[cells, , drop = FALSE]
+  by_donor <- split(cell_meta$stim, cell_meta$donor_id)
+  paired_donors <- names(by_donor)[
+    vapply(by_donor, function(x) all(c("CTRL", "STIM") %in% x), logical(1))
+  ]
+  if (length(paired_donors) < 2L) {
+    message("Skipping ", cell_type, ": fewer than two donors have both conditions.")
     next
   }
 
-  # Set identities to condition within this cell type
-  Idents(obj_ct) <- "stim"
-
-  # DE: STIM vs CTRL
-  markers <- FindMarkers(
-    obj_ct,
-    ident.1 = "STIM",
-    ident.2 = "CTRL",
-    test.use = "wilcox",
-    logfc.threshold = 0.25,
-    min.pct = 0.10
+  cell_meta <- cell_meta[cell_meta$donor_id %in% paired_donors, , drop = FALSE]
+  sample_key <- paste(cell_meta$donor_id, cell_meta$stim, sep = "__")
+  sample_levels <- unique(sample_key)
+  sample_meta <- data.frame(
+    donor_id = cell_meta$donor_id[match(sample_levels, sample_key)],
+    stim = cell_meta$stim[match(sample_levels, sample_key)],
+    row.names = sample_levels,
+    stringsAsFactors = FALSE
   )
+  sample_meta$donor_id <- factor(sample_meta$donor_id)
+  sample_meta$stim <- relevel(factor(sample_meta$stim, levels = c("CTRL", "STIM")), ref = "CTRL")
 
-  markers <- markers %>%
-    tibble::rownames_to_column("gene") %>%
-    arrange(p_val_adj, desc(avg_log2FC))
+  design_matrix <- model.matrix(~ donor_id + stim, data = sample_meta)
+  if (qr(design_matrix)$rank < ncol(design_matrix)) {
+    message("Skipping ", cell_type, ": paired donor design is not full rank.")
+    next
+  }
 
-  out_csv <- file.path("results/de_celltype", paste0(gsub("[ /]", "_", ct), "_STIM_vs_CTRL.csv"))
-  write.csv(markers, out_csv, row.names = FALSE)
-
-  # Summary: top up/down genes
-  top_up <- markers %>% filter(!is.na(p_val_adj)) %>% arrange(p_val_adj, desc(avg_log2FC)) %>% head(10)
-  top_dn <- markers %>% filter(!is.na(p_val_adj)) %>% arrange(p_val_adj, avg_log2FC) %>% head(10)
-
-  all_summaries[[ct]] <- list(
-    celltype = ct,
-    n_cells = ncol(obj_ct),
-    n_ctrl = as.integer(tab["CTRL"]),
-    n_stim = as.integer(tab["STIM"]),
-    top_up = paste(top_up$gene, collapse = ";"),
-    top_dn = paste(top_dn$gene, collapse = ";")
+  aggregation <- Matrix::sparse.model.matrix(
+    ~ 0 + factor(sample_key, levels = sample_levels)
   )
+  colnames(aggregation) <- sample_levels
+  pseudobulk <- as.matrix(counts[, rownames(cell_meta), drop = FALSE] %*% aggregation)
+  if (anyNA(pseudobulk) || any(!is.finite(pseudobulk)) || any(pseudobulk < 0) ||
+      any(pseudobulk > .Machine$integer.max) || any(pseudobulk != floor(pseudobulk))) {
+    stop("Pseudobulk counts must be finite non-negative integers within R's integer range.")
+  }
+  storage.mode(pseudobulk) <- "integer"
+  if (!identical(colnames(pseudobulk), rownames(sample_meta))) {
+    stop("Pseudobulk columns and sample metadata are out of order for ", cell_type, ".")
+  }
+
+  dds <- DESeqDataSetFromMatrix(
+    countData = pseudobulk,
+    colData = sample_meta,
+    design = ~ donor_id + stim
+  )
+  keep_genes <- rowSums(counts(dds) >= 10) >= 2L
+  dds <- dds[keep_genes, ]
+  if (nrow(dds) < 2L) {
+    message("Skipping ", cell_type, ": fewer than two genes pass the count filter.")
+    next
+  }
+  dds <- DESeq(dds, quiet = TRUE)
+  res <- results(dds, contrast = c("stim", "STIM", "CTRL"), alpha = 0.05)
+  res_df <- as.data.frame(res)
+  res_df$gene <- rownames(res_df)
+  res_df$cell_type <- cell_type
+  res_df$n_paired_donors <- length(paired_donors)
+  res_df$significant_padj_lt_0_05 <- !is.na(res_df$padj) & res_df$padj < 0.05
+  result_rows[[cell_type]] <- res_df
+
+  summary_rows[[cell_type]] <- data.frame(
+    cell_type = cell_type,
+    n_paired_donors = length(paired_donors),
+    n_cells_CTRL = sum(cell_meta$stim == "CTRL"),
+    n_cells_STIM = sum(cell_meta$stim == "STIM"),
+    n_genes_tested = nrow(dds),
+    n_significant_padj_lt_0_05 = sum(res_df$significant_padj_lt_0_05),
+    design = "~ donor_id + stim",
+    contrast = "STIM versus CTRL",
+    stringsAsFactors = FALSE
+  )
+  message(cell_type, ": paired pseudobulk DE completed for ", length(paired_donors), " donors.")
 }
 
-summary_df <- dplyr::bind_rows(lapply(all_summaries, as.data.frame))
-write.csv(summary_df, "results/de_celltype/DE_summary_top_genes.csv", row.names = FALSE)
-
-message("Saved per-celltype DE tables to results/de_celltype/")
-message("Saved summary to results/de_celltype/DE_summary_top_genes.csv")
+if (!length(result_rows)) stop("No cell type had enough paired donor samples for pseudobulk DE.")
+all_results <- do.call(rbind, result_rows)
+all_results <- all_results[order(all_results$cell_type, all_results$padj, na.last = TRUE), ]
+write.csv(all_results, "results/de_celltype/IFNB_pseudobulk_DESeq2_by_celltype.csv", row.names = FALSE)
+write.csv(do.call(rbind, summary_rows), "results/de_celltype/IFNB_pseudobulk_summary.csv", row.names = FALSE)
+message("Saved donor-level pseudobulk DESeq2 results and summary.")
