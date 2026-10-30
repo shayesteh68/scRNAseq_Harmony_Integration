@@ -1,0 +1,15 @@
+Excluding 203 cells without a high-confidence donor assignment from pseudobulk DE.
+B: paired pseudobulk DE completed for 8 donors.
+B Activated: paired pseudobulk DE completed for 8 donors.
+CD14 Mono: paired pseudobulk DE completed for 8 donors.
+CD16 Mono: paired pseudobulk DE completed for 8 donors.
+CD4 Memory T: paired pseudobulk DE completed for 8 donors.
+CD4 Naive T: paired pseudobulk DE completed for 8 donors.
+CD8 T: paired pseudobulk DE completed for 8 donors.
+DC: paired pseudobulk DE completed for 8 donors.
+Eryth: paired pseudobulk DE completed for 6 donors.
+Mk: paired pseudobulk DE completed for 8 donors.
+NK: paired pseudobulk DE completed for 8 donors.
+pDC: paired pseudobulk DE completed for 8 donors.
+T activated: paired pseudobulk DE completed for 8 donors.
+Saved donor-level pseudobulk DESeq2 results and summary.

@@ -1,0 +1,14 @@
+"cell_type","n_paired_donors","n_cells_CTRL","n_cells_STIM","n_genes_tested","n_significant_padj_lt_0_05","design","contrast","n_significant_global_padj_lt_0_05"
+"B",8,407,553,2314,434,"~ donor_id + stim","STIM versus CTRL",451
+"B Activated",8,185,198,1585,130,"~ donor_id + stim","STIM versus CTRL",155
+"CD14 Mono",8,2215,2086,5628,2859,"~ donor_id + stim","STIM versus CTRL",2601
+"CD16 Mono",8,507,521,3029,1136,"~ donor_id + stim","STIM versus CTRL",1055
+"CD4 Memory T",8,859,876,3089,371,"~ donor_id + stim","STIM versus CTRL",423
+"CD4 Naive T",8,978,1497,4571,520,"~ donor_id + stim","STIM versus CTRL",609
+"CD8 T",8,352,450,2025,233,"~ donor_id + stim","STIM versus CTRL",268
+"DC",8,258,208,2192,856,"~ donor_id + stim","STIM versus CTRL",792
+"Eryth",6,22,29,230,22,"~ donor_id + stim","STIM versus CTRL",24
+"Mk",8,115,114,693,97,"~ donor_id + stim","STIM versus CTRL",111
+"NK",8,298,310,1640,214,"~ donor_id + stim","STIM versus CTRL",244
+"pDC",8,51,79,761,145,"~ donor_id + stim","STIM versus CTRL",150
+"T activated",8,300,322,1912,214,"~ donor_id + stim","STIM versus CTRL",239

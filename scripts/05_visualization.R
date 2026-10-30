@@ -17,15 +17,18 @@ p_dot <- DotPlot(obj, features = isg_genes, cols = c("lightgrey", "firebrick3"))
         axis.title = element_blank(),
         panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8)) +
   labs(title = "IFN-beta response genes by cell type and condition")
-ggsave("figures/de_celltype/ISG_signature_dotplot.png", p_dot, width = 11, height = 9, dpi = 300)
+ggsave("figures/de_celltype/ISG_signature_dotplot.png", p_dot, width = 11, height = 9, dpi = 300, bg = "white")
 
 de_file <- "results/de_celltype/IFNB_pseudobulk_DESeq2_by_celltype.csv"
 if (file.exists(de_file)) {
   de <- read.csv(de_file, stringsAsFactors = FALSE)
-  monocytes <- de[de$cell_type == "CD14 Mono" & !is.na(de$padj), , drop = FALSE]
+  if (!"padj_global_BH" %in% names(de)) {
+    stop("Pseudobulk results must include the cross-cell-type BH adjustment from scripts/04_celltype_DE_IFNB.R.")
+  }
+  monocytes <- de[de$cell_type == "CD14 Mono" & !is.na(de$padj_global_BH), , drop = FALSE]
   if (nrow(monocytes)) {
-    monocytes$neg_log10_padj <- -log10(pmax(monocytes$padj, .Machine$double.xmin))
-    monocytes$significant <- monocytes$padj < 0.05
+    monocytes$neg_log10_padj <- -log10(pmax(monocytes$padj_global_BH, .Machine$double.xmin))
+    monocytes$significant <- monocytes$padj_global_BH < 0.05
     volcano <- ggplot(monocytes, aes(log2FoldChange, neg_log10_padj, color = significant)) +
       geom_point(alpha = 0.7, size = 1.5) +
       scale_color_manual(values = c("FALSE" = "grey70", "TRUE" = "#d95f02")) +
@@ -33,11 +36,11 @@ if (file.exists(de_file)) {
       labs(
         title = "CD14 Mono: paired donor pseudobulk DE",
         x = "DESeq2 log2 fold change (STIM versus CTRL)",
-        y = "-log10 adjusted p-value",
-        color = "padj < 0.05"
+        y = "-log10 globally adjusted p-value",
+        color = "Global BH < 0.05"
       ) +
       theme_bw()
-    ggsave("figures/de_celltype/Monocyte_IFNB_Volcano.png", volcano, width = 8, height = 6, dpi = 300)
+    ggsave("figures/de_celltype/Monocyte_IFNB_Volcano.png", volcano, width = 8, height = 6, dpi = 300, bg = "white")
   } else {
     message("No CD14 Mono pseudobulk results available for a volcano plot.")
   }

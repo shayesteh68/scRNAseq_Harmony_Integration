@@ -16,8 +16,8 @@ metadata <- obj[[]]
 if (!all(required %in% colnames(metadata))) {
   stop("Object metadata must contain: ", paste(required, collapse = ", "))
 }
-if (anyNA(metadata$stim) || anyNA(metadata$donor_id) || anyNA(metadata$seurat_annotations)) {
-  stop("Stimulation, donor, and cell-type metadata must not contain missing values.")
+if (anyNA(metadata$stim) || anyNA(metadata$seurat_annotations)) {
+  stop("Stimulation and cell-type metadata must not contain missing values.")
 }
 metadata$stim <- as.character(metadata$stim)
 metadata$donor_id <- as.character(metadata$donor_id)
@@ -25,6 +25,10 @@ metadata$seurat_annotations <- as.character(metadata$seurat_annotations)
 if (!all(metadata$stim %in% c("CTRL", "STIM"))) {
   stop("Expected stim values CTRL and STIM.")
 }
+known_donor <- !is.na(metadata$donor_id) & nzchar(metadata$donor_id) & metadata$donor_id != "unknown"
+message("Excluding ", sum(!known_donor), " cells without a high-confidence donor assignment from pseudobulk DE.")
+if (!any(known_donor)) stop("No cells have a high-confidence donor assignment.")
+obj <- subset(obj, cells = rownames(metadata)[known_donor])
 
 DefaultAssay(obj) <- "RNA"
 obj <- JoinLayers(obj, assay = "RNA")
@@ -58,7 +62,7 @@ for (cell_type in cell_types) {
     row.names = sample_levels,
     stringsAsFactors = FALSE
   )
-  sample_meta$donor_id <- factor(sample_meta$donor_id)
+  sample_meta$donor_id <- factor(gsub("[^[:alnum:]_.]", "_", sample_meta$donor_id))
   sample_meta$stim <- relevel(factor(sample_meta$stim, levels = c("CTRL", "STIM")), ref = "CTRL")
 
   design_matrix <- model.matrix(~ donor_id + stim, data = sample_meta)
@@ -118,6 +122,39 @@ for (cell_type in cell_types) {
 if (!length(result_rows)) stop("No cell type had enough paired donor samples for pseudobulk DE.")
 all_results <- do.call(rbind, result_rows)
 all_results <- all_results[order(all_results$cell_type, all_results$padj, na.last = TRUE), ]
+all_results$padj_global_BH <- p.adjust(all_results$pvalue, method = "BH")
+all_results$significant_global_padj_lt_0_05 <- !is.na(all_results$padj_global_BH) &
+  all_results$padj_global_BH < 0.05
 write.csv(all_results, "results/de_celltype/IFNB_pseudobulk_DESeq2_by_celltype.csv", row.names = FALSE)
-write.csv(do.call(rbind, summary_rows), "results/de_celltype/IFNB_pseudobulk_summary.csv", row.names = FALSE)
+summary_df <- do.call(rbind, summary_rows)
+summary_df$n_significant_global_padj_lt_0_05 <- vapply(summary_df$cell_type, function(cell_type) {
+  sum(all_results$cell_type == cell_type & all_results$significant_global_padj_lt_0_05)
+}, integer(1))
+write.csv(summary_df, "results/de_celltype/IFNB_pseudobulk_summary.csv", row.names = FALSE)
+
+top_by_direction <- function(x, positive) {
+  if (positive) {
+    selected <- x[!is.na(x$padj) & x$padj < 0.05 & x$log2FoldChange > 0, , drop = FALSE]
+  } else {
+    selected <- x[!is.na(x$padj) & x$padj < 0.05 & x$log2FoldChange < 0, , drop = FALSE]
+  }
+  selected <- selected[order(selected$padj, -abs(selected$log2FoldChange)), , drop = FALSE]
+  paste(head(selected$gene, 10L), collapse = ";")
+}
+top_summary <- do.call(rbind, lapply(names(result_rows), function(cell_type) {
+  stats <- summary_df[summary_df$cell_type == cell_type, , drop = FALSE]
+  data.frame(
+    celltype = cell_type,
+    n_paired_donors = stats$n_paired_donors,
+    n_cells = stats$n_cells_CTRL + stats$n_cells_STIM,
+    n_ctrl = stats$n_cells_CTRL,
+    n_stim = stats$n_cells_STIM,
+    n_significant_padj_lt_0_05 = stats$n_significant_padj_lt_0_05,
+    n_significant_global_padj_lt_0_05 = stats$n_significant_global_padj_lt_0_05,
+    top_up = top_by_direction(result_rows[[cell_type]], positive = TRUE),
+    top_dn = top_by_direction(result_rows[[cell_type]], positive = FALSE),
+    stringsAsFactors = FALSE
+  )
+}))
+write.csv(top_summary, "results/de_celltype/DE_summary_top_genes.csv", row.names = FALSE)
 message("Saved donor-level pseudobulk DESeq2 results and summary.")

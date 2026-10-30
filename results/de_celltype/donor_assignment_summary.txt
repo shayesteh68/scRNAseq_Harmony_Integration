@@ -1,0 +1,9 @@
+IFNB donor assignment summary
+Cells: 13999
+Unique high-confidence singlet assignments: 13796
+Unassigned/ambiguous cells excluded from pseudobulk DE: 203
+Demuxlet donors represented: 8
+Donors represented in both CTRL and STIM: 8
+Barcode assignments were matched within stimulation condition.
+Control source MD5: eaef34891cdc6ce3896de1113b4bdd85
+Stimulated source MD5: 812d2a2142210a566737e9cc36a9876a

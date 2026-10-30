@@ -1,0 +1,16 @@
+Using the existing local IFNB object: data/raw/ifnb_raw.rds
+Validating object structure
+Updating object slots
+Ensuring keys are in the proper structure
+Ensuring keys are in the proper structure
+Ensuring feature names don't have underscores or pipes
+Updating slots in RNA
+Validating object structure for Assay5 ‘RNA’
+Object representation is consistent with the most current Seurat version
+High-confidence donor assignments: 13796/13999 cells; donors represented: 8
+Donors represented in both conditions: 8
+Loaded the SeuratData ifnb object:
+An object of class Seurat
+14053 features across 13999 samples within 1 assay
+Active assay: RNA (14053 features, 0 variable features)
+ 2 layers present: counts, data
