@@ -2,6 +2,8 @@
 
 This repository analyzes the public SeuratData IFNB PBMC example (13,999 cells and 14,053 features). It runs cell-level QC, exploratory Harmony alignment, clustering, donor-level pseudobulk differential expression, and plots. Differential expression uses raw RNA counts and paired donor models; it does not use Harmony-corrected values.
 
+The IFNB example derives from the public PBMC stimulation study by Kang et al., “Multiplexed droplet single-cell RNA-sequencing using natural genetic variation,” *Nature Biotechnology* (2018), [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042); GEO series [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583). This is an independent computational case study, not a commissioned analysis or a collaboration with the authors or their institutions.
+
 ## Environment and data
 
 For the exact audited Linux x86_64 environment, create it from the lockfile:
